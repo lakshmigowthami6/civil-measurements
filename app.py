@@ -948,119 +948,458 @@ with tab6:
 with tab7:
     st.subheader("Structural Drawings & Reinforcement Detailing")
 
-    sub_draw_tab1, sub_draw_tab2, sub_draw_tab3 = st.tabs([
+    # Geometry & coordinates for detailing
+    L = inp["L_outer"]
+    W = inp["W_outer"]
+    tw = inp["t_wall"]
+    Hw = inp["H_wall"]
+    Hh = inp["H_hopper"]
+    Lo = inp["L_outlet"]
+    Wo = inp["W_outlet"]
+    cover_m = inp["cover_mm"] / 1000.0
+
+    Li = stage1["L_internal"]
+    Wi = stage1["W_internal"]
+    x1, x2 = -L / 2.0, L / 2.0
+    y1, y2 = -W / 2.0, W / 2.0
+    ox1, ox2 = -Lo / 2.0, Lo / 2.0
+    oy1, oy2 = -Wo / 2.0, Wo / 2.0
+    z_outlet = -Hh
+    z_column_bottom = z_outlet - column_h
+
+    col_bw = column_b / 1000.0
+    col_Dw = column_D / 1000.0
+    rx = col_bw / 2.0 - cover_m
+    ry = col_Dw / 2.0 - cover_m
+
+    with st.expander("⚙️ Detailing Bar Sizes & Spacing Controls (Fine-Tune)", expanded=False):
+        c_det1, c_det2, c_det3, c_det4 = st.columns(4)
+        with c_det1:
+            st.markdown("**Side Walls**")
+            d_wall_v_dia = st.number_input("Wall Vert Dia (mm)", value=wall_vert_dia, step=2)
+            d_wall_v_sp = st.number_input("Wall Vert Spacing (mm)", value=int(wall_vert_spacing), step=25)
+            d_wall_h_dia = st.number_input("Wall Horiz Dia (mm)", value=wall_horiz_dia, step=2)
+            d_wall_h_sp = st.number_input("Wall Horiz Spacing (mm)", value=int(wall_horiz_spacing), step=25)
+        with c_det2:
+            st.markdown("**Corner Columns**")
+            d_col_dia = st.number_input("Column Main Dia (mm)", value=col_bar_dia, step=2)
+            d_col_count = st.number_input("Column Bar Count", value=int(col_bar_count), step=2, min_value=4)
+            d_col_tie_dia = st.number_input("Column Tie Dia (mm)", value=col_tie_dia, step=2)
+            d_col_tie_sp = st.number_input("Column Tie Spacing (mm)", value=int(col_tie_spacing), step=25)
+        with c_det3:
+            st.markdown("**Top & Outlet Beams**")
+            d_edge_dia = st.number_input("Edge Beam Bar Dia (mm)", value=beam_main_dia, step=2)
+            d_edge_stirrup_dia = st.number_input("Edge Beam Stirrup (mm)", value=beam_stirrup_dia, step=2)
+            d_out_dia = st.number_input("Outlet Beam Bar Dia (mm)", value=beam_main_dia, step=2)
+            d_out_stirrup_dia = st.number_input("Outlet Stirrup Dia (mm)", value=beam_stirrup_dia, step=2)
+        with c_det4:
+            st.markdown("**Hopper Slab**")
+            d_hop_main_dia = st.number_input("Hopper Main Dia (mm)", value=slab_main_dia, step=2)
+            d_hop_main_sp = st.number_input("Hopper Main Spacing (mm)", value=int(slab_main_spacing_limit), step=25)
+            d_hop_dist_dia = st.number_input("Hopper Dist Dia (mm)", value=slab_dist_dia, step=2)
+            d_hop_dist_sp = st.number_input("Hopper Dist Spacing (mm)", value=int(slab_dist_spacing_limit), step=25)
+
+    sub_draw_tab1, sub_draw_tab2, sub_draw_tab3, sub_draw_tab4 = st.tabs([
         "📐 2D Plan View",
         "📏 2D Section View",
-        "🕸️ 3D Reinforcement Cage"
+        "🕸️ 3D Reinforcement Cage",
+        "📋 Reinforcement Detailing Summary"
     ])
 
+    # -------------------------------------------------------------------------
+    # 1. 2D PLAN VIEW
+    # -------------------------------------------------------------------------
     with sub_draw_tab1:
-        fig_plan, ax_plan = plt.subplots(figsize=(10, 8))
-        L = inp["L_outer"]
-        W = inp["W_outer"]
-        Li = stage1["L_internal"]
-        Wi = stage1["W_internal"]
-        Lo = inp["L_outlet"]
-        Wo = inp["W_outlet"]
+        fig_plan, ax_plan = plt.subplots(figsize=(12, 10), dpi=150)
 
-        # Outer & Inner Perimeter
-        ax_plan.plot([-L/2, L/2, L/2, -L/2, -L/2], [-W/2, -W/2, W/2, W/2, -W/2], "k-", lw=3, label="Outer Wall")
-        ax_plan.plot([-Li/2, Li/2, Li/2, -Li/2, -Li/2], [-Wi/2, -Wi/2, Wi/2, Wi/2, -Wi/2], "k--", lw=1.5, label="Inner Wall")
-        ax_plan.plot([-Lo/2, Lo/2, Lo/2, -Lo/2, -Lo/2], [-Wo/2, -Wo/2, Wo/2, Wo/2, -Wo/2], "b-", lw=2, label="Outlet Opening")
+        P = [(-Li / 2.0, -Wi / 2.0), (Li / 2.0, -Wi / 2.0), (Li / 2.0, Wi / 2.0), (-Li / 2.0, Wi / 2.0)]
+        Q = [(-Lo / 2.0, -Wo / 2.0), (Lo / 2.0, -Wo / 2.0), (Lo / 2.0, Wo / 2.0), (-Lo / 2.0, Wo / 2.0)]
 
-        # Corner columns
-        for cx in [-L/2, L/2]:
-            for cy in [-W/2, W/2]:
-                ax_plan.add_patch(plt.Rectangle((cx - 0.15, cy - 0.15), 0.3, 0.3, color="gray", alpha=0.5))
+        outer_x = [-L / 2.0, L / 2.0, L / 2.0, -L / 2.0, -L / 2.0]
+        outer_y = [-W / 2.0, -W / 2.0, W / 2.0, W / 2.0, -W / 2.0]
+        inner_x = [-Li / 2.0, Li / 2.0, Li / 2.0, -Li / 2.0, -Li / 2.0]
+        inner_y = [-Wi / 2.0, -Wi / 2.0, Wi / 2.0, Wi / 2.0, -Wi / 2.0]
 
-        # Hip lines from corners to outlet
-        ax_plan.plot([-Li/2, -Lo/2], [-Wi/2, -Wo/2], "r-", lw=2, label="Hip Corner Rebar")
-        ax_plan.plot([Li/2, Lo/2], [-Wi/2, -Wo/2], "r-", lw=2)
-        ax_plan.plot([Li/2, Lo/2], [Wi/2, Wo/2], "r-", lw=2)
-        ax_plan.plot([-Li/2, -Lo/2], [Wi/2, Wo/2], "r-", lw=2)
+        ax_plan.plot(outer_x, outer_y, color="black", linewidth=3, label="Outer bunker wall")
+        ax_plan.plot(inner_x, inner_y, color="gray", linewidth=2, linestyle="--", label="Inner wall face")
 
-        ax_plan.set_title("BUNKER REINFORCEMENT – 2D PLAN VIEW", fontsize=14, fontweight="bold")
-        ax_plan.set_xlabel("Length (m)")
-        ax_plan.set_ylabel("Width (m)")
-        ax_plan.legend(loc="upper right")
+        # Top edge beams
+        for i in range(4):
+            j = (i + 1) % 4
+            ax_plan.plot([P[i][0], P[j][0]], [P[i][1], P[j][1]], color="purple", linewidth=6, label="Top edge beams" if i == 0 else None)
+
+        # Central outlet beams
+        for i in range(4):
+            j = (i + 1) % 4
+            ax_plan.plot([Q[i][0], Q[j][0]], [Q[i][1], Q[j][1]], color="darkorange", linewidth=5, label="Outlet supporting beams" if i == 0 else None)
+
+        # Central outlet opening
+        outlet_x = [Q[0][0], Q[1][0], Q[2][0], Q[3][0], Q[0][0]]
+        outlet_y = [Q[0][1], Q[1][1], Q[2][1], Q[3][1], Q[0][1]]
+        ax_plan.fill(outlet_x, outlet_y, color="white", zorder=3)
+        ax_plan.plot(outlet_x, outlet_y, color="black", linewidth=2, zorder=4)
+
+        # Hopper main reinforcement (13 lines on each face running down the slope)
+        main_positions = np.linspace(0.06, 0.94, 13)
+        for i in range(4):
+            j = (i + 1) % 4
+            for u in main_positions:
+                start_x = P[i][0] + u * (P[j][0] - P[i][0])
+                start_y = P[i][1] + u * (P[j][1] - P[i][1])
+                end_x = Q[i][0] + u * (Q[j][0] - Q[i][0])
+                end_y = Q[i][1] + u * (Q[j][1] - Q[i][1])
+                ax_plan.plot([start_x, end_x], [start_y, end_y], color="blue", linewidth=1.3, zorder=2, label="Hopper main bars" if i == 0 and u == main_positions[0] else None)
+
+        # Hopper distribution reinforcement (9 lines across each face)
+        distribution_positions = np.linspace(0.10, 0.90, 9)
+        for i in range(4):
+            j = (i + 1) % 4
+            for v in distribution_positions:
+                start_x = P[i][0] + v * (Q[i][0] - P[i][0])
+                start_y = P[i][1] + v * (Q[i][1] - P[i][1])
+                end_x = P[j][0] + v * (Q[j][0] - P[j][0])
+                end_y = P[j][1] + v * (Q[j][1] - P[j][1])
+                ax_plan.plot([start_x, end_x], [start_y, end_y], color="green", linewidth=1.3, linestyle="--", zorder=2, label="Hopper distribution bars" if i == 0 and v == distribution_positions[0] else None)
+
+        # Four hip corner bars
+        for i in range(4):
+            ax_plan.plot([P[i][0], Q[i][0]], [P[i][1], Q[i][1]], color="black", linewidth=2.5, linestyle=":", label="Hopper hip bars" if i == 0 else None)
+
+        # Four corner columns
+        column_positions = [(x1, y1), (x2, y1), (x2, y2), (x1, y2)]
+        column_labels = ["C1", "C2", "C3", "C4"]
+        label_offsets = [(-0.35, -0.35), (0.35, -0.35), (0.35, 0.35), (-0.35, 0.35)]
+
+        for index, (cx, cy) in enumerate(column_positions):
+            ax_plan.add_patch(plt.Rectangle((cx - col_bw / 2.0, cy - col_Dw / 2.0), col_bw, col_Dw, fill=False, edgecolor="black", linewidth=2.5, zorder=5))
+            for k in range(int(d_col_count)):
+                ang = 2.0 * np.pi * k / float(d_col_count)
+                bx = cx + rx * np.cos(ang)
+                by = cy + ry * np.sin(ang)
+                ax_plan.plot(bx, by, marker="o", color="red", markersize=4, zorder=6)
+
+            dx, dy = label_offsets[index]
+            ax_plan.text(cx + dx, cy + dy, column_labels[index], fontsize=11, fontweight="bold", ha="center", va="center", bbox=dict(facecolor="white", edgecolor="black", alpha=0.9, boxstyle="round,pad=0.2"))
+
+        # Wall vertical reinforcement (plan dots)
+        spacing_v = d_wall_v_sp / 1000.0
+        for xx in np.arange(-Li / 2.0, Li / 2.0 + 0.001, spacing_v):
+            for yy in [-W / 2.0 + cover_m, W / 2.0 - cover_m]:
+                ax_plan.plot(xx, yy, marker="o", color="red", markersize=2.8, zorder=4)
+
+        for yy in np.arange(-Wi / 2.0, Wi / 2.0 + 0.001, spacing_v):
+            for xx in [-L / 2.0 + cover_m, L / 2.0 - cover_m]:
+                ax_plan.plot(xx, yy, marker="o", color="red", markersize=2.8, zorder=4)
+
+        ax_plan.text(0, 0, "HOPPER\nOPENING", ha="center", va="center", fontsize=10, fontweight="bold", zorder=7, bbox=dict(facecolor="white", edgecolor="black", alpha=0.8, boxstyle="round,pad=0.2"))
+        ax_plan.set_title("BUNKER REINFORCEMENT – 2D PLAN VIEW", fontsize=14, fontweight="bold", pad=12)
+        ax_plan.set_xlabel("Length (m)", fontsize=11)
+        ax_plan.set_ylabel("Width (m)", fontsize=11)
         ax_plan.set_aspect("equal")
-        ax_plan.grid(True, linestyle=":", alpha=0.6)
-        st.pyplot(fig_plan)
+        ax_plan.grid(True, alpha=0.25)
+        ax_plan.legend(loc="upper left", bbox_to_anchor=(1.02, 1), fontsize=9)
+        fig_plan.tight_layout()
 
+        st.pyplot(fig_plan, bbox_inches="tight")
+
+        # Download button for high-res PNG
+        buf_plan = io.BytesIO()
+        fig_plan.savefig(buf_plan, format="png", bbox_inches="tight", dpi=200)
+        st.download_button(
+            label="📥 Download 2D Plan View (High-Res PNG)",
+            data=buf_plan.getvalue(),
+            file_name="Bunker_2D_Plan_View.png",
+            mime="image/png"
+        )
+        plt.close(fig_plan)
+
+    # -------------------------------------------------------------------------
+    # 2. 2D SECTION VIEW
+    # -------------------------------------------------------------------------
     with sub_draw_tab2:
-        fig_sec, ax_sec = plt.subplots(figsize=(10, 7))
-        Hw = inp["H_wall"]
-        Hh = inp["H_hopper"]
-        tw = inp["t_wall"]
-        col_H = column_h
+        fig_sec, ax_sec = plt.subplots(figsize=(12, 9), dpi=150)
 
-        # Wall outlines
-        ax_sec.plot([-L/2, -L/2], [0, Hw], "k-", lw=4)
-        ax_sec.plot([L/2, L/2], [0, Hw], "k-", lw=4)
-        ax_sec.plot([-L/2, L/2], [Hw, Hw], color="purple", lw=5, label="Top Edge Beam")
+        # Side walls
+        ax_sec.plot([x1, x1], [0, Hw], color="black", linewidth=5, label="Side Wall Section")
+        ax_sec.plot([x2, x2], [0, Hw], color="black", linewidth=5)
 
-        # Hopper slope
-        ax_sec.plot([-L/2 + tw, -Lo/2], [0, -Hh], "k-", lw=4)
-        ax_sec.plot([L/2 - tw, Lo/2], [0, -Hh], "k-", lw=4)
-        ax_sec.plot([-Lo/2, Lo/2], [-Hh, -Hh], color="darkorange", lw=6, label="Outlet Beam")
+        # Top edge beam
+        ax_sec.plot([x1, x2], [Hw, Hw], color="purple", linewidth=7, label="Top Edge Beam")
 
-        # Columns
-        for cx in [-L/2, L/2]:
-            ax_sec.plot([cx, cx], [-Hh - col_H, 0], "k-", lw=6)
-            ax_sec.plot([cx - 0.1, cx - 0.1], [-Hh - col_H, 0], "r-", lw=1.5, label="Column Rebar" if cx == -L/2 else "")
-            ax_sec.plot([cx + 0.1, cx + 0.1], [-Hh - col_H, 0], "r-", lw=1.5)
+        # Hopper slab
+        ax_sec.plot([x1 + tw, ox1], [0, z_outlet], color="black", linewidth=5, label="Hopper Slab")
+        ax_sec.plot([x2 - tw, ox2], [0, z_outlet], color="black", linewidth=5)
 
-        ax_sec.set_title("BUNKER REINFORCEMENT – 2D SECTION VIEW", fontsize=14, fontweight="bold")
-        ax_sec.set_xlabel("Length (m)")
-        ax_sec.set_ylabel("Elevation (m)")
-        ax_sec.grid(True, linestyle=":", alpha=0.6)
-        ax_sec.legend(loc="upper right")
-        ax_sec.set_aspect("equal")
-        st.pyplot(fig_sec)
+        # Outlet beam
+        ax_sec.plot([ox1, ox2], [z_outlet, z_outlet], color="darkorange", linewidth=7, label="Outlet Beam")
 
+        # Four corner columns (two visible in section)
+        for i, cx in enumerate([x1, x2]):
+            ax_sec.plot([cx, cx], [z_column_bottom, 0], color="black", linewidth=7, label="Corner Column" if i == 0 else None)
+            for offset in [-col_bw / 2.0 + cover_m, col_bw / 2.0 - cover_m]:
+                ax_sec.plot([cx + offset, cx + offset], [z_column_bottom, 0], color="red", linewidth=1.5, label="Column Main Bar" if i == 0 and offset < 0 else None)
+            for zz in np.arange(z_column_bottom, 0, d_col_tie_sp / 1000.0):
+                ax_sec.plot([cx - col_bw / 2.0 + cover_m, cx + col_bw / 2.0 - cover_m], [zz, zz], color="green", linewidth=1, label="Column Ties" if i == 0 and zz == z_column_bottom else None)
+
+        # Wall vertical reinforcement
+        v_sp = d_wall_v_sp / 1000.0
+        for j, xx in enumerate(np.arange(x1 + tw, x2 - tw + 0.001, v_sp)):
+            ax_sec.plot([xx, xx], [0, Hw], color="red", linewidth=1, label="Wall Vertical Rebar" if j == 0 else None)
+
+        # Wall horizontal reinforcement
+        h_sp = d_wall_h_sp / 1000.0
+        for k, zz in enumerate(np.arange(0, Hw + 0.001, h_sp)):
+            ax_sec.plot([x1 + tw, x2 - tw], [zz, zz], color="blue", linewidth=1, label="Wall Horizontal Rebar" if k == 0 else None)
+
+        # Hopper reinforcement bars (represented on each sloping face)
+        for f in np.linspace(0.08, 0.92, 10):
+            xx_left = (x1 + tw) + f * (ox1 - (x1 + tw))
+            zz_left = 0 + f * z_outlet
+            xx_right = (x2 - tw) + f * (ox2 - (x2 - tw))
+            zz_right = 0 + f * z_outlet
+            ax_sec.plot([xx_left, xx_left], [zz_left - 0.04, zz_left + 0.04], color="blue", linewidth=2, label="Hopper Rebar Layer" if f < 0.1 else None)
+            ax_sec.plot([xx_right, xx_right], [zz_right - 0.04, zz_right + 0.04], color="blue", linewidth=2)
+
+        # Labels
+        ax_sec.text(0, Hw + 0.25, "TOP EDGE BEAM", ha="center", color="purple", fontweight="bold", fontsize=10, bbox=dict(facecolor="white", edgecolor="purple", alpha=0.9, boxstyle="round,pad=0.2"))
+        ax_sec.text(0, z_outlet - 0.35, "BOTTOM OUTLET BEAM", ha="center", color="darkorange", fontweight="bold", fontsize=10, bbox=dict(facecolor="white", edgecolor="darkorange", alpha=0.9, boxstyle="round,pad=0.2"))
+        ax_sec.text(x1 - 0.35, Hw / 2.0, "SIDE WALL", rotation=90, ha="center", va="center", fontweight="bold", fontsize=10)
+        ax_sec.text(x1 - 0.45, z_column_bottom / 2.0, "CORNER COLUMN", rotation=90, ha="center", va="center", fontweight="bold", fontsize=10)
+        ax_sec.text(0, -Hh / 2.0, "SLOPING HOPPER SLAB", ha="center", va="center", fontweight="bold", fontsize=10, bbox=dict(facecolor="white", edgecolor="black", alpha=0.8, boxstyle="round,pad=0.2"))
+
+        ax_sec.set_title("BUNKER REINFORCEMENT – 2D SECTION VIEW", fontsize=14, fontweight="bold", pad=12)
+        ax_sec.set_xlabel("Length (m)", fontsize=11)
+        ax_sec.set_ylabel("Elevation / Height (m)", fontsize=11)
+        ax_sec.grid(True, alpha=0.3)
+        ax_sec.set_aspect("equal", adjustable="datalim")
+        ax_sec.legend(loc="upper left", bbox_to_anchor=(1.02, 1), fontsize=9)
+        fig_sec.tight_layout()
+
+        st.pyplot(fig_sec, bbox_inches="tight")
+
+        # Download button for high-res PNG
+        buf_sec = io.BytesIO()
+        fig_sec.savefig(buf_sec, format="png", bbox_inches="tight", dpi=200)
+        st.download_button(
+            label="📥 Download 2D Section View (High-Res PNG)",
+            data=buf_sec.getvalue(),
+            file_name="Bunker_2D_Section_View.png",
+            mime="image/png"
+        )
+        plt.close(fig_sec)
+
+    # -------------------------------------------------------------------------
+    # 3. 3D REINFORCEMENT CAGE
+    # -------------------------------------------------------------------------
     with sub_draw_tab3:
-        # Full 3D interactive wireframe of reinforcement cage
         fig_3d_rebar = go.Figure()
 
-        def add_line_3d(points, color="red", width=4, name=None):
+        def add_line_3d(points, color="black", width=5, name=None):
+            xs = [p[0] for p in points]
+            ys = [p[1] for p in points]
+            zs = [p[2] for p in points]
             fig_3d_rebar.add_trace(go.Scatter3d(
-                x=[p[0] for p in points],
-                y=[p[1] for p in points],
-                z=[p[2] for p in points],
+                x=xs, y=ys, z=zs,
                 mode="lines",
                 line=dict(color=color, width=width),
                 name=name,
                 showlegend=(name is not None)
             ))
 
-        # Top edge beams
-        top_z = inp["H_wall"]
-        add_line_3d([(-L/2, -W/2, top_z), (L/2, -W/2, top_z), (L/2, W/2, top_z), (-L/2, W/2, top_z), (-L/2, -W/2, top_z)], color="purple", width=6, name="Top Edge Beam")
+        # 1. Concrete wall outline frames
+        corners = [(x1, y1), (x2, y1), (x2, y2), (x1, y2)]
+        for i in range(4):
+            a = corners[i]
+            b = corners[(i + 1) % 4]
+            add_line_3d([
+                (a[0], a[1], 0), (a[0], a[1], Hw),
+                (b[0], b[1], Hw), (b[0], b[1], 0)
+            ], color="gray", width=6, name="Bunker Wall Outline" if i == 0 else None)
 
-        # Outlet beams
-        out_z = -Hh
-        add_line_3d([(-Lo/2, -Wo/2, out_z), (Lo/2, -Wo/2, out_z), (Lo/2, Wo/2, out_z), (-Lo/2, Wo/2, out_z), (-Lo/2, -Wo/2, out_z)], color="orange", width=6, name="Outlet Ring Beam")
+        # 2. Top horizontal edge beams
+        top_beams = [
+            [(x1, y1, Hw), (x2, y1, Hw)],
+            [(x2, y1, Hw), (x2, y2, Hw)],
+            [(x2, y2, Hw), (x1, y2, Hw)],
+            [(x1, y2, Hw), (x1, y1, Hw)]
+        ]
+        for i, line in enumerate(top_beams):
+            add_line_3d(line, color="purple", width=10, name="Top Edge Beams" if i == 0 else None)
 
-        # Corner columns
-        bot_z = -Hh - column_h
-        for i, (cx, cy) in enumerate([(-L/2, -W/2), (L/2, -W/2), (L/2, W/2), (-L/2, W/2)]):
-            for angle in np.linspace(0, 2*np.pi, col_bar_count, endpoint=False):
-                bx = cx + 0.1 * np.cos(angle)
-                by = cy + 0.1 * np.sin(angle)
-                add_line_3d([(bx, by, bot_z), (bx, by, 0)], color="red", width=3, name="Column Main Bar" if i == 0 and angle == 0 else None)
+        # 3. Four corner columns
+        for i, (cx, cy) in enumerate(corners):
+            add_line_3d([
+                (cx - col_bw / 2.0, cy - col_Dw / 2.0, z_column_bottom),
+                (cx + col_bw / 2.0, cy - col_Dw / 2.0, z_column_bottom),
+                (cx + col_bw / 2.0, cy + col_Dw / 2.0, z_column_bottom),
+                (cx - col_bw / 2.0, cy + col_Dw / 2.0, z_column_bottom),
+                (cx - col_bw / 2.0, cy - col_Dw / 2.0, z_column_bottom)
+            ], color="gray", width=5, name="Corner Columns" if i == 0 else None)
+
+            # Column main bars
+            for j in range(int(d_col_count)):
+                ang = 2.0 * np.pi * j / float(d_col_count)
+                bx = cx + rx * np.cos(ang)
+                by = cy + ry * np.sin(ang)
+                add_line_3d([(bx, by, z_column_bottom), (bx, by, 0)], color="red", width=5, name="Column Main Bars" if i == 0 and j == 0 else None)
+
+            # Column ties
+            for zz in np.arange(z_column_bottom, 0, d_col_tie_sp / 1000.0):
+                add_line_3d([
+                    (cx - rx, cy - ry, zz),
+                    (cx + rx, cy - ry, zz),
+                    (cx + rx, cy + ry, zz),
+                    (cx - rx, cy + ry, zz),
+                    (cx - rx, cy - ry, zz)
+                ], color="green", width=3, name="Column Ties" if i == 0 and zz == z_column_bottom else None)
+
+        # 4. Wall vertical reinforcement
+        v_sp = d_wall_v_sp / 1000.0
+        for xx in np.arange(x1 + tw, x2 - tw + 0.001, v_sp):
+            for yy in [y1 + cover_m, y2 - cover_m]:
+                add_line_3d([(xx, yy, 0), (xx, yy, Hw)], color="red", width=3, name="Wall Vertical Bars" if xx == x1 + tw and yy == y1 + cover_m else None)
+
+        for yy in np.arange(y1 + tw, y2 - tw + 0.001, v_sp):
+            for xx in [x1 + cover_m, x2 - cover_m]:
+                add_line_3d([(xx, yy, 0), (xx, yy, Hw)], color="red", width=3)
+
+        # 5. Wall horizontal reinforcement
+        h_sp = d_wall_h_sp / 1000.0
+        for zz in np.arange(0, Hw + 0.001, h_sp):
+            add_line_3d([(x1 + tw, y1 + cover_m, zz), (x2 - tw, y1 + cover_m, zz)], color="blue", width=3, name="Wall Horizontal Bars" if zz == 0 else None)
+            add_line_3d([(x1 + tw, y2 - cover_m, zz), (x2 - tw, y2 - cover_m, zz)], color="blue", width=3)
+            add_line_3d([(x1 + cover_m, y1 + tw, zz), (x1 + cover_m, y2 - tw, zz)], color="blue", width=3)
+            add_line_3d([(x2 - cover_m, y1 + tw, zz), (x2 - cover_m, y2 - tw, zz)], color="blue", width=3)
+
+        # 6. Four hopper concrete faces (transparent mesh)
+        outer_points = [(x1 + tw, y1 + tw, 0), (x2 - tw, y1 + tw, 0), (x2 - tw, y2 - tw, 0), (x1 + tw, y2 - tw, 0)]
+        outlet_points = [(ox1, oy1, z_outlet), (ox2, oy1, z_outlet), (ox2, oy2, z_outlet), (ox1, oy2, z_outlet)]
+
+        for i in range(4):
+            j = (i + 1) % 4
+            p1 = outer_points[i]
+            p2 = outer_points[j]
+            p3 = outlet_points[j]
+            p4 = outlet_points[i]
+            fig_3d_rebar.add_trace(go.Mesh3d(
+                x=[p1[0], p2[0], p3[0], p4[0]],
+                y=[p1[1], p2[1], p3[1], p4[1]],
+                z=[p1[2], p2[2], p3[2], p4[2]],
+                i=[0, 0], j=[1, 2], k=[2, 3],
+                opacity=0.15, color="lightgray",
+                name="Hopper Slab Panel",
+                showlegend=(i == 0)
+            ))
+
+        # 7. Hopper main reinforcement
+        n_hopper = max(2, int((Li * 1000.0) / max(float(d_hop_main_sp), 50.0)))
+        for i in range(4):
+            j = (i + 1) % 4
+            p1 = np.array(outer_points[i], dtype=float)
+            p2 = np.array(outer_points[j], dtype=float)
+            q1 = np.array(outlet_points[i], dtype=float)
+            q2 = np.array(outlet_points[j], dtype=float)
+            for f in np.linspace(0.05, 0.95, n_hopper):
+                start = p1 + f * (p2 - p1)
+                end = q1 + f * (q2 - q1)
+                add_line_3d([tuple(start), tuple(end)], color="blue", width=4, name="Hopper Main Bars" if i == 0 and f < 0.06 else None)
+
+        # 8. Hopper distribution reinforcement
+        for i in range(4):
+            j = (i + 1) % 4
+            p1 = np.array(outer_points[i], dtype=float)
+            p2 = np.array(outer_points[j], dtype=float)
+            q1 = np.array(outlet_points[i], dtype=float)
+            q2 = np.array(outlet_points[j], dtype=float)
+            for f in np.linspace(0.1, 0.9, 9):
+                start = p1 + f * (q1 - p1)
+                end = p2 + f * (q2 - p2)
+                add_line_3d([tuple(start), tuple(end)], color="orange", width=3, name="Hopper Distribution Bars" if i == 0 and f < 0.12 else None)
+
+        # 9. Four outlet supporting beams
+        outlet_beams = [
+            [(ox1, oy1, z_outlet), (ox2, oy1, z_outlet)],
+            [(ox2, oy1, z_outlet), (ox2, oy2, z_outlet)],
+            [(ox2, oy2, z_outlet), (ox1, oy2, z_outlet)],
+            [(ox1, oy2, z_outlet), (ox1, oy1, z_outlet)]
+        ]
+        for i, line in enumerate(outlet_beams):
+            add_line_3d(line, color="darkorange", width=10, name="Outlet Supporting Beams" if i == 0 else None)
+
+        # 10. Outlet opening
+        add_line_3d([
+            (ox1, oy1, z_outlet), (ox2, oy1, z_outlet),
+            (ox2, oy2, z_outlet), (ox1, oy2, z_outlet),
+            (ox1, oy1, z_outlet)
+        ], color="black", width=5, name="Outlet Opening")
 
         fig_3d_rebar.update_layout(
-            title="3D Reinforcement Cage Model",
+            title="3D RCC BUNKER – COMPLETE REINFORCEMENT DETAILING",
             scene=dict(
                 xaxis_title="Length (m)",
                 yaxis_title="Width (m)",
                 zaxis_title="Elevation (m)",
                 aspectmode="data"
             ),
-            margin=dict(l=0, r=0, b=0, t=30),
-            height=550
+            margin=dict(l=0, r=0, b=0, t=50),
+            height=800,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="center",
+                x=0.5
+            )
         )
         st.plotly_chart(fig_3d_rebar, use_container_width=True)
+
+    # -------------------------------------------------------------------------
+    # 4. REINFORCEMENT DETAILING SUMMARY
+    # -------------------------------------------------------------------------
+    with sub_draw_tab4:
+        st.write("##### Reinforcement Detailing Summary Table")
+        col_s1, col_s2 = st.columns(2)
+        with col_s1:
+            st.markdown(f"""
+            <div style="background-color: #F8FAFC; padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 12px;">
+                <h4 style="margin: 0 0 8px 0; color: #1E3A8A;">1. Corner Columns (4 Nos)</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #334155;">
+                    <li><strong>Column Size:</strong> {column_b:.0f} mm × {column_D:.0f} mm</li>
+                    <li><strong>Longitudinal Steel:</strong> {d_col_count:.0f} nos of #{d_col_dia:.0f} mm bars</li>
+                    <li><strong>Column Lateral Ties:</strong> #{d_col_tie_dia:.0f} mm @ {d_col_tie_sp:.0f} mm c/c</li>
+                    <li><strong>Column Free Height:</strong> {column_h:.2f} m</li>
+                </ul>
+            </div>
+            <div style="background-color: #F8FAFC; padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 12px;">
+                <h4 style="margin: 0 0 8px 0; color: #1E3A8A;">2. Top Edge Beams (4 Nos)</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #334155;">
+                    <li><strong>Beam Section:</strong> {outlet_beam_b:.0f} mm × {outlet_beam_D:.0f} mm</li>
+                    <li><strong>Longitudinal Steel:</strong> #{d_edge_dia:.0f} mm bars (continuous perimeter)</li>
+                    <li><strong>Stirrups:</strong> #{d_edge_stirrup_dia:.0f} mm 2-legged @ {beam_stirrup_spacing:.0f} mm c/c</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+        with col_s2:
+            st.markdown(f"""
+            <div style="background-color: #F8FAFC; padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 12px;">
+                <h4 style="margin: 0 0 8px 0; color: #1E3A8A;">3. Vertical Side Walls</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #334155;">
+                    <li><strong>Wall Thickness:</strong> {tw:.3f} m ({tw*1000:.0f} mm)</li>
+                    <li><strong>Vertical Reinforcement:</strong> #{d_wall_v_dia:.0f} mm @ {d_wall_v_sp:.0f} mm c/c</li>
+                    <li><strong>Horizontal Reinforcement:</strong> #{d_wall_h_dia:.0f} mm @ {d_wall_h_sp:.0f} mm c/c</li>
+                </ul>
+            </div>
+            <div style="background-color: #F8FAFC; padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 12px;">
+                <h4 style="margin: 0 0 8px 0; color: #1E3A8A;">4. Hopper Slab & Outlet Beams</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #334155;">
+                    <li><strong>Hopper Slab Thickness:</strong> {inp['t_hopper']:.3f} m ({inp['t_hopper']*1000:.0f} mm)</li>
+                    <li><strong>Hopper Main Steel:</strong> #{d_hop_main_dia:.0f} mm @ {d_hop_main_sp:.0f} mm c/c</li>
+                    <li><strong>Distribution Steel:</strong> #{d_hop_dist_dia:.0f} mm @ {d_hop_dist_sp:.0f} mm c/c</li>
+                    <li><strong>Outlet Beams (4 Nos):</strong> {outlet_beam_b:.0f} mm × {outlet_beam_D:.0f} mm with #{d_out_dia:.0f} mm main & #{d_out_stirrup_dia:.0f} mm stirrups</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+
 
 # =============================================================================
 # TAB 8: REPORT GENERATION & PDF EXPORT
@@ -1175,3 +1514,4 @@ st.markdown(
     "</div>",
     unsafe_allow_html=True
 )
+

@@ -131,3 +131,4 @@ civil-measurements/
 ## ⚠️ Engineering Disclaimer
 
 *This application is an educational and preliminary engineering sizing tool. Final structural designs, rebar schedules, and construction drawings for critical storage bins must be independently verified by a licensed structural engineer with certified structural analysis software in accordance with project-specific soil, seismic, wind, and material conditions.*
+
