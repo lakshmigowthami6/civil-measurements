@@ -1,0 +1,22 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Jupyter & checkpoints
+.ipynb_checkpoints/
+extracted_notebook_code.py
+
+# Streamlit logs and local data
+.streamlit/secrets.toml
+*.log
+*.tmp
+*.pdf
